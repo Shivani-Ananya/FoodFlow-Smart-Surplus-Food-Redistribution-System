@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FoodFlow – Surplus Food Redistribution</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root {
+    --green: #2d7a4f;
+    --green-light: #3fa86b;
+    --green-pale: #e8f5ed;
+    --red: #c0392b;
+    --red-light: #e74c3c;
+    --red-pale: #fdf0ee;
+    --orange: #d97706;
+    --orange-light: #f59e0b;
+    --orange-pale: #fef3c7;
+    --blue: #1d4ed8;
+    --blue-pale: #eff6ff;
+    --cream: #faf8f4;
+    --dark: #1a1a1a;
+    --gray: #6b7280;
+    --border: #e5e0d8;
+    --shadow: 0 4px 24px rgba(0,0,0,0.08);
+    --shadow-lg: 0 12px 48px rgba(0,0,0,0.14);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    color: var(--dark);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ══════════════ LOGIN ══════════════ */
+  #login-screen {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #0f2e1d 0%, #1a4a30 40%, #0d2518 100%);
+    overflow: hidden;
+  }
+  .login-bg-pattern {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(63,168,107,0.12) 0%, transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(45,122,79,0.1) 0%, transparent 50%),
+      radial-gradient(circle at 50% 90%, rgba(63,168,107,0.08) 0%, transparent 40%);
+  }
+  .login-dots {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .login-card {
+    position: relative; z-index: 1;
+    background: rgba(255,255,255,0.97);
+    border-radius: 24px; padding: 52px 48px 44px; width: 420px;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
+    animation: slideUp 0.6s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  @keyframes slideUp {
+    from { opacity:0; transform:translateY(32px) scale(0.97); }
+    to   { opacity:1; transform:translateY(0) scale(1); }
+  }
+  .login-logo { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .login-logo-icon {
+    width:40px; height:40px; border-radius:10px;
+    background:linear-gradient(135deg, var(--green), var(--green-light));
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; flex-shrink:0;
+    box-shadow:0 4px 12px rgba(45,122,79,0.4);
+  }
+  .login-brand { font-family:'DM Serif Display',serif; font-size:22px; color:var(--dark); letter-spacing:-0.3px; }
+  .login-tagline { font-size:13px; color:var(--gray); margin-bottom:36px; line-height:1.5; padding-left:50px; }
+  .login-divider { height:1px; background:var(--border); margin-bottom:32px; }
+  .login-label { display:block; font-size:12px; font-weight:600; letter-spacing:0.6px; text-transform:uppercase; color:var(--gray); margin-bottom:8px; }
+  .login-input {
+    width:100%; padding:13px 16px; border:1.5px solid var(--border); border-radius:10px;
+    font-family:'DM Sans',sans-serif; font-size:15px; color:var(--dark);
+    background:var(--cream); margin-bottom:20px;
+    transition:border-color 0.2s, box-shadow 0.2s; outline:none;
+  }
+  .login-input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(45,122,79,0.12); background:#fff; }
+  .login-btn {
+    width:100%; padding:14px;
+    background:linear-gradient(135deg, var(--green), var(--green-light));
+    color:#fff; border:none; border-radius:10px;
+    font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600;
+    cursor:pointer; transition:transform 0.15s, box-shadow 0.15s;
+    box-shadow:0 4px 16px rgba(45,122,79,0.35); letter-spacing:0.2px;
+  }
+  .login-btn:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(45,122,79,0.45); }
+  .login-btn:active { transform:translateY(0); }
+  .login-hint {
+    margin-top:22px; background:var(--green-pale); border:1px solid rgba(45,122,79,0.15);
+    border-radius:10px; padding:14px 16px; font-size:12.5px; color:var(--green); line-height:1.7;
+  }
+  .login-hint strong { font-weight:600; }
+  .login-error {
+    display:none; background:var(--red-pale); border:1px solid rgba(192,57,43,0.2);
+    border-radius:8px; padding:10px 14px; font-size:13px; color:var(--red);
+    margin-bottom:16px; animation:shake 0.35s ease;
+  }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)}
+  }
+
+  /* ══════════════ DASHBOARD ══════════════ */
+  #dashboard { display:none; flex-direction:column; height:100vh; }
+
+  .topbar {
+    background:#fff; border-bottom:1px solid var(--border);
+    padding:0 24px; height:60px;
+    display:flex; align-items:center; justify-content:space-between;
+    z-index:1000; position:relative; box-shadow:0 2px 12px rgba(0,0,0,0.06);
+  }
+  .topbar-left { display:flex; align-items:center; gap:12px; }
+  .topbar-logo-icon {
+    width:32px; height:32px; border-radius:8px;
+    background:linear-gradient(135deg, var(--green), var(--green-light));
+    display:flex; align-items:center; justify-content:center; font-size:16px;
+    box-shadow:0 2px 8px rgba(45,122,79,0.3);
+  }
+  .topbar-brand { font-family:'DM Serif Display',serif; font-size:18px; color:var(--dark); letter-spacing:-0.2px; }
+  .topbar-subtitle { font-size:12px; color:var(--gray); font-weight:400; }
+  .topbar-right { display:flex; align-items:center; gap:10px; }
+
+  .role-badge { display:flex; align-items:center; gap:7px; padding:6px 14px; border-radius:20px; font-size:13px; font-weight:500; }
+  .role-badge.provider { background:var(--green-pale); color:var(--green); border:1px solid rgba(45,122,79,0.2); }
+  .role-badge.receiver { background:var(--red-pale); color:var(--red); border:1px solid rgba(192,57,43,0.15); }
+  .role-badge.volunteer { background:var(--blue-pale); color:var(--blue); border:1px solid rgba(29,78,216,0.15); }
+  .role-dot { width:7px; height:7px; border-radius:50%; animation:pulse-dot 2s infinite; }
+  .provider .role-dot { background:var(--green); }
+  .receiver .role-dot { background:var(--red); }
+  .volunteer .role-dot { background:var(--blue); }
+  @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.3)} }
+
+  .logout-btn {
+    padding:7px 18px; border:1.5px solid var(--border); border-radius:8px;
+    background:#fff; color:var(--gray); font-family:'DM Sans',sans-serif;
+    font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s;
+  }
+  .logout-btn:hover { border-color:var(--red-light); color:var(--red-light); background:var(--red-pale); }
+
+  /* FILTER BAR */
+  .filterbar {
+    background:#fff; border-bottom:1px solid var(--border);
+    padding:0 24px; height:50px;
+    display:flex; align-items:center; gap:8px; flex-wrap:nowrap; overflow-x:auto;
+    z-index:999; position:relative;
+  }
+  .filterbar::-webkit-scrollbar { display:none; }
+  .filter-label { font-size:11.5px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:var(--gray); margin-right:4px; white-space:nowrap; }
+  .filter-btn {
+    padding:6px 14px; border-radius:20px; border:1.5px solid var(--border);
+    background:var(--cream); font-family:'DM Sans',sans-serif;
+    font-size:12.5px; font-weight:500; color:var(--gray); cursor:pointer;
+    transition:all 0.2s; display:flex; align-items:center; gap:5px; white-space:nowrap;
+  }
+  .filter-btn:hover { border-color:var(--gray); color:var(--dark); }
+  .filter-btn.active-all    { background:var(--dark); color:#fff; border-color:var(--dark); }
+  .filter-btn.active-food   { background:var(--green); color:#fff; border-color:var(--green); }
+  .filter-btn.active-hunger { background:var(--red); color:#fff; border-color:var(--red); }
+  .filter-btn.active-match  { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .filter-btn.active-heat   { background:var(--orange); color:#fff; border-color:var(--orange); }
+
+  .filter-dot { width:8px; height:8px; border-radius:50%; }
+  .filter-sep { width:1px; height:24px; background:var(--border); flex-shrink:0; }
+
+  .stats-strip { margin-left:auto; display:flex; align-items:center; gap:18px; flex-shrink:0; }
+  .stat-item { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--gray); white-space:nowrap; }
+  .stat-num { font-weight:700; font-size:13px; }
+  .stat-num.green  { color:var(--green); }
+  .stat-num.red    { color:var(--red); }
+  .stat-num.orange { color:var(--orange); }
+  .stat-num.blue   { color:var(--blue); }
+
+  /* MAP */
+  #map-wrap { flex:1; position:relative; overflow:hidden; }
+  #map { width:100%; height:100%; }
+
+  /* FLOATING BUTTONS */
+  .fab-group {
+    position:absolute; bottom:40px; right:20px; z-index:900;
+    display:flex; flex-direction:column; gap:10px; align-items:flex-end;
+  }
+
+  .fab {
+    padding:13px 22px; border:none; border-radius:50px;
+    font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:600;
+    cursor:pointer; display:flex; align-items:center; gap:8px;
+    transition:transform 0.2s, box-shadow 0.2s; white-space:nowrap;
+  }
+  .fab:hover { transform:translateY(-2px); }
+
+  #add-surplus-btn {
+    background:linear-gradient(135deg, var(--green), var(--green-light));
+    color:#fff; box-shadow:0 6px 24px rgba(45,122,79,0.45);
+    animation:floatIn 0.5s 0.3s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  #add-surplus-btn:hover { box-shadow:0 10px 30px rgba(45,122,79,0.55); }
+  #add-surplus-btn.picking { background:linear-gradient(135deg,#c0392b,#e74c3c); box-shadow:0 6px 24px rgba(192,57,43,0.45); animation:none; }
+
+  #match-btn {
+    background:linear-gradient(135deg, var(--blue), #3b82f6);
+    color:#fff; box-shadow:0 6px 20px rgba(29,78,216,0.35);
+    animation:floatIn 0.5s 0.4s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  #match-btn:hover { box-shadow:0 10px 28px rgba(29,78,216,0.45); }
+
+  #sos-btn {
+    background:linear-gradient(135deg, #7c3aed, #a855f7);
+    color:#fff; box-shadow:0 6px 20px rgba(124,58,237,0.4);
+    animation:floatIn 0.5s 0.5s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  #sos-btn:hover { box-shadow:0 10px 28px rgba(124,58,237,0.5); }
+
+  #heat-btn {
+    background:linear-gradient(135deg, var(--orange), var(--orange-light));
+    color:#fff; box-shadow:0 6px 20px rgba(217,119,6,0.4);
+    animation:floatIn 0.5s 0.6s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  #heat-btn:hover { box-shadow:0 10px 28px rgba(217,119,6,0.5); }
+
+  @keyframes floatIn {
+    from { opacity:0; transform:translateY(20px) scale(0.9); }
+    to   { opacity:1; transform:translateY(0) scale(1); }
+  }
+
+  /* LEGEND */
+  .map-legend {
+    position:absolute; bottom:40px; left:20px; z-index:900;
+    background:rgba(255,255,255,0.96); border:1px solid var(--border);
+    border-radius:14px; padding:16px 20px;
+    box-shadow:var(--shadow); backdrop-filter:blur(8px);
+    animation:floatIn 0.5s 0.4s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  .legend-title { font-size:10.5px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:var(--gray); margin-bottom:12px; }
+  .legend-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:12.5px; color:var(--dark); font-weight:500; }
+  .legend-row:last-child { margin-bottom:0; }
+  .legend-marker { width:13px; height:13px; border-radius:50%; flex-shrink:0; box-shadow:0 2px 6px rgba(0,0,0,0.2); }
+  .legend-marker.green  { background:radial-gradient(circle at 35% 35%,#5ecf85,var(--green)); }
+  .legend-marker.red    { background:radial-gradient(circle at 35% 35%,#e87066,var(--red)); }
+  .legend-marker.orange { background:radial-gradient(circle at 35% 35%,#fbbf24,var(--orange)); }
+  .legend-marker.gray   { background:radial-gradient(circle at 35% 35%,#d1d5db,#6b7280); }
+  .legend-marker.purple { background:radial-gradient(circle at 35% 35%,#c084fc,#7c3aed); animation:pulse-sos 1s infinite; }
+  @keyframes pulse-sos { 0%,100%{transform:scale(1)} 50%{transform:scale(1.4)} }
+
+  /* MATCH PANEL */
+  #match-panel {
+    position:absolute; top:20px; right:20px; z-index:900;
+    background:#fff; border:1px solid var(--border); border-radius:16px;
+    padding:20px 22px; width:300px; box-shadow:var(--shadow-lg);
+    display:none; animation:slideUp 0.3s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  #match-panel.open { display:block; }
+  .match-panel-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .match-panel-title { font-family:'DM Serif Display',serif; font-size:16px; color:var(--dark); }
+  .match-close-btn { background:none; border:none; color:var(--gray); font-size:18px; cursor:pointer; padding:2px 6px; border-radius:6px; transition:background 0.2s; }
+  .match-close-btn:hover { background:var(--cream); }
+  .match-result { font-size:13px; color:var(--dark); line-height:1.7; }
+  .match-arrow { color:var(--blue); font-weight:700; margin:4px 0; display:block; }
+  .match-tag { display:inline-block; padding:2px 9px; border-radius:12px; font-size:11px; font-weight:600; }
+  .match-tag.dist { background:var(--blue-pale); color:var(--blue); }
+  .match-tag.meals{ background:var(--green-pale); color:var(--green); }
+  .match-draw-btn {
+    margin-top:12px; width:100%; padding:9px; background:var(--blue); color:#fff;
+    border:none; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600;
+    cursor:pointer; transition:background 0.2s;
+  }
+  .match-draw-btn:hover { background:var(--blue-light,#2563eb); }
+
+  /* MODAL */
+  .modal-overlay {
+    position:fixed; inset:0; z-index:9998;
+    background:rgba(0,0,0,0.5); display:none;
+    align-items:center; justify-content:center; backdrop-filter:blur(4px);
+  }
+  .modal-overlay.open { display:flex; }
+  .modal-card {
+    background:#fff; border-radius:20px; padding:36px 36px 32px; width:380px;
+    box-shadow:var(--shadow-lg); animation:slideUp 0.35s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  .modal-header { display:flex; align-items:center; gap:10px; margin-bottom:24px; }
+  .modal-icon { width:36px; height:36px; border-radius:9px; background:var(--green-pale); display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .modal-title { font-family:'DM Serif Display',serif; font-size:20px; color:var(--dark); }
+  .modal-label { display:block; font-size:11.5px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:var(--gray); margin-bottom:7px; }
+  .modal-input {
+    width:100%; padding:11px 14px; border:1.5px solid var(--border); border-radius:9px;
+    font-family:'DM Sans',sans-serif; font-size:14px; color:var(--dark); background:var(--cream);
+    margin-bottom:18px; outline:none; transition:border-color 0.2s, box-shadow 0.2s;
+  }
+  .modal-input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(45,122,79,0.1); background:#fff; }
+  .modal-actions { display:flex; gap:10px; margin-top:4px; }
+  .modal-confirm {
+    flex:1; padding:12px;
+    background:linear-gradient(135deg, var(--green), var(--green-light));
+    color:#fff; border:none; border-radius:9px;
+    font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600;
+    cursor:pointer; transition:transform 0.15s, box-shadow 0.15s;
+    box-shadow:0 3px 12px rgba(45,122,79,0.35);
+  }
+  .modal-confirm:hover { transform:translateY(-1px); }
+  .modal-cancel {
+    padding:12px 20px; border:1.5px solid var(--border); border-radius:9px;
+    background:#fff; color:var(--gray); font-family:'DM Sans',sans-serif;
+    font-size:14px; font-weight:500; cursor:pointer; transition:all 0.2s;
+  }
+  .modal-cancel:hover { border-color:var(--gray); color:var(--dark); }
+
+  /* CUSTOM POPUP */
+  .custom-popup .leaflet-popup-content-wrapper {
+    border-radius:14px; box-shadow:0 8px 32px rgba(0,0,0,0.14);
+    border:1px solid var(--border); padding:0; overflow:hidden;
+  }
+  .custom-popup .leaflet-popup-tip { display:none; }
+  .custom-popup .leaflet-popup-content { margin:0; }
+  .popup-body { padding:18px 20px 16px; min-width:210px; }
+  .popup-type-badge {
+    display:inline-flex; align-items:center; gap:5px; padding:3px 10px;
+    border-radius:20px; font-size:11px; font-weight:600; letter-spacing:0.4px;
+    text-transform:uppercase; margin-bottom:10px;
+  }
+  .popup-type-badge.green  { background:var(--green-pale); color:var(--green); }
+  .popup-type-badge.red    { background:var(--red-pale);   color:var(--red); }
+  .popup-type-badge.orange { background:var(--orange-pale);color:var(--orange); }
+  .popup-type-badge.gray   { background:#f3f4f6; color:#6b7280; }
+  .popup-name { font-family:'DM Serif Display',serif; font-size:17px; color:var(--dark); line-height:1.3; margin-bottom:10px; }
+  .popup-detail { display:flex; align-items:center; gap:7px; font-size:13px; color:var(--gray); margin-bottom:6px; }
+  .popup-detail:last-of-type { margin-bottom:0; }
+  .popup-timer { font-size:12px; font-weight:600; padding:3px 9px; border-radius:20px; display:inline-block; margin-top:8px; }
+  .popup-timer.ok  { background:var(--green-pale); color:var(--green); }
+  .popup-timer.warn{ background:var(--orange-pale);color:var(--orange); animation:pulse-timer 1.2s infinite; }
+  @keyframes pulse-timer { 0%,100%{opacity:1} 50%{opacity:0.55} }
+
+  .popup-actions { display:flex; gap:7px; margin-top:14px; flex-wrap:wrap; }
+  .popup-btn {
+    padding:7px 13px; border-radius:8px; border:none; font-family:'DM Sans',sans-serif;
+    font-size:12.5px; font-weight:600; cursor:pointer; transition:all 0.2s;
+    display:flex; align-items:center; gap:5px;
+  }
+  .popup-btn.primary { background:var(--green); color:#fff; }
+  .popup-btn.primary:hover { background:var(--green-light); }
+  .popup-btn.secondary { background:var(--cream); color:var(--dark); border:1.5px solid var(--border); }
+  .popup-btn.secondary:hover { background:var(--border); }
+  .popup-btn.danger { background:var(--red-pale); color:var(--red); }
+  .popup-btn.danger:hover { background:var(--red); color:#fff; }
+  .popup-btn.blue-btn { background:var(--blue-pale); color:var(--blue); }
+  .popup-btn.blue-btn:hover { background:var(--blue); color:#fff; }
+  .popup-btn.volunteer-btn { background:#f3e8ff; color:#7c3aed; }
+  .popup-btn.volunteer-btn:hover { background:#7c3aed; color:#fff; }
+
+  #map.picking-mode { cursor:crosshair !important; }
+
+  /* TOAST STACK */
+  #toast-container {
+    position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+    z-index:9990; display:flex; flex-direction:column; align-items:center; gap:8px;
+    pointer-events:none;
+  }
+  .toast-item {
+    background:var(--dark); color:#fff; padding:11px 22px; border-radius:50px;
+    font-size:13.5px; font-weight:500; white-space:nowrap;
+    animation:toastIn 0.3s cubic-bezier(0.16,1,0.3,1) both;
+    max-width:90vw;
+  }
+  .toast-item.out { animation:toastOut 0.3s ease forwards; }
+  @keyframes toastIn  { from{opacity:0;transform:translateY(12px) scale(0.95)} to{opacity:1;transform:translateY(0) scale(1)} }
+  @keyframes toastOut { from{opacity:1;transform:translateY(0) scale(1)} to{opacity:0;transform:translateY(-8px) scale(0.95)} }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════ LOGIN ════════════════════ -->
+<div id="login-screen">
+  <div class="login-bg-pattern"></div>
+  <div class="login-dots"></div>
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">🌱</div>
+      <div class="login-brand">FoodFlow</div>
+    </div>
+    <div class="login-tagline">Surplus Food Redistribution Platform</div>
+    <div class="login-divider"></div>
+    <div class="login-error" id="login-error">⚠ Invalid login credentials. Please try again.</div>
+    <label class="login-label" for="username">Username</label>
+    <input class="login-input" id="username" type="text" placeholder="Enter username" autocomplete="username"/>
+    <label class="login-label" for="password">Password</label>
+    <input class="login-input" id="password" type="password" placeholder="Enter password" autocomplete="current-password"/>
+    <button class="login-btn" onclick="doLogin()">Sign In →</button>
+    <div class="login-hint">
+      <strong>Demo accounts:</strong><br/>
+      🟢 Provider: <strong>provider</strong> / <strong>1234</strong><br/>
+      🔴 Receiver: <strong>receiver</strong> / <strong>1234</strong><br/>
+      🔵 Volunteer: <strong>volunteer</strong> / <strong>1234</strong>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ DASHBOARD ════════════════════ -->
+<div id="dashboard">
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo-icon">🌱</div>
+      <div>
+        <div class="topbar-brand">FoodFlow</div>
+        <div class="topbar-subtitle">Surplus Food Redistribution Map</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div id="role-badge" class="role-badge"></div>
+      <button class="logout-btn" onclick="doLogout()">Log out</button>
+    </div>
+  </div>
+
+  <!-- Filter / Action Bar -->
+  <div class="filterbar">
+    <span class="filter-label">Filter:</span>
+    <button class="filter-btn active-all" id="btn-all"    onclick="setFilter('all')">Show All</button>
+    <button class="filter-btn"            id="btn-food"   onclick="setFilter('food')">
+      <span class="filter-dot" style="background:var(--green)"></span>Food Available
+    </button>
+    <button class="filter-btn"            id="btn-hunger" onclick="setFilter('hunger')">
+      <span class="filter-dot" style="background:var(--red)"></span>Food Needed
+    </button>
+    <div class="filter-sep"></div>
+    <button class="filter-btn"            id="btn-heat"   onclick="toggleHeatmap()">🔥 Heatmap</button>
+    <div class="stats-strip">
+      <div class="stat-item">🟢 <span class="stat-num green" id="stat-food">5</span> sources</div>
+      <div class="stat-item">🔴 <span class="stat-num red"   id="stat-hunger">5</span> zones</div>
+      <div class="stat-item">🍽 <span class="stat-num orange" id="stat-meals">245</span> meals saved</div>
+      <div class="stat-item">♻ <span class="stat-num blue"  id="stat-waste">123</span> kg waste reduced</div>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="map-wrap">
+    <div id="map"></div>
+
+    <!-- Match result panel -->
+    <div id="match-panel">
+      <div class="match-panel-header">
+        <div class="match-panel-title">🔍 Best Match Found</div>
+        <button class="match-close-btn" onclick="closeMatchPanel()">✕</button>
+      </div>
+      <div id="match-result" class="match-result"></div>
+      <button class="match-draw-btn" id="match-draw-btn" onclick="drawMatchRoute()">📍 Show Route on Map</button>
+    </div>
+
+    <!-- FAB group -->
+    <div class="fab-group">
+      <button class="fab" id="sos-btn"        onclick="addSOS()">🚨 Urgent Need</button>
+      <button class="fab" id="heat-btn"        onclick="toggleHeatmap()">🌡 Toggle Heatmap</button>
+      <button class="fab" id="match-btn"       onclick="findBestMatch()">🔍 Find Best Match</button>
+      <button class="fab" id="add-surplus-btn" style="display:none" onclick="togglePickMode()">
+        <span id="add-btn-icon">＋</span>
+        <span id="add-btn-text">Add Surplus Food</span>
+      </button>
+    </div>
+
+    <!-- Legend -->
+    <div class="map-legend">
+      <div class="legend-title">Legend</div>
+      <div class="legend-row"><div class="legend-marker green"></div>Food Available</div>
+      <div class="legend-row"><div class="legend-marker red"></div>Food Needed</div>
+      <div class="legend-row"><div class="legend-marker orange"></div>Reserved</div>
+      <div class="legend-row"><div class="legend-marker gray"></div>Completed</div>
+      <div class="legend-row"><div class="legend-marker purple"></div>SOS / Urgent</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Surplus Food -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-icon">🌿</div>
+      <div class="modal-title">Add Surplus Food</div>
+    </div>
+    <label class="modal-label" for="m-name">Location Name</label>
+    <input class="modal-input" id="m-name" type="text" placeholder="e.g. MRC Nagar Restaurant"/>
+    <label class="modal-label" for="m-qty">Food Quantity (meals)</label>
+    <input class="modal-input" id="m-qty" type="number" placeholder="e.g. 35" min="1"/>
+    <label class="modal-label" for="m-time">Pickup Deadline</label>
+    <input class="modal-input" id="m-time" type="text" placeholder="e.g. 8:00 PM"/>
+    <label class="modal-label" for="m-expires">Expires in (minutes)</label>
+    <input class="modal-input" id="m-expires" type="number" placeholder="e.g. 90" min="1"/>
+    <div class="modal-actions">
+      <button class="modal-cancel"  onclick="closeModal()">Cancel</button>
+      <button class="modal-confirm" onclick="confirmAdd()">Add Marker ＋</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   DATA
+══════════════════════════════════════════════════════ */
+const FOOD_SOURCES = [
+  { name:"Anna Nagar Restaurant",     lat:13.0850, lng:80.2101, qty:40, time:"9:30 PM", expiresMin:80  },
+  { name:"T Nagar Hotel",             lat:13.0418, lng:80.2341, qty:25, time:"8:00 PM", expiresMin:45  },
+  { name:"Velachery College Canteen", lat:12.9816, lng:80.2209, qty:60, time:"7:30 PM", expiresMin:30  },
+  { name:"Adyar Cafe",                lat:13.0012, lng:80.2565, qty:30, time:"10:00 PM",expiresMin:120 },
+  { name:"OMR Tech Park Food Court",  lat:12.9262, lng:80.2310, qty:50, time:"9:00 PM", expiresMin:100 },
+];
+
+const HUNGER_ZONES = [
+  { name:"Saidapet Shelter",          lat:13.0229, lng:80.2224, need:30, time:"8:30 PM"  },
+  { name:"Perambur Community Center", lat:13.1165, lng:80.2431, need:50, time:"7:00 PM"  },
+  { name:"Royapuram Area",            lat:13.1131, lng:80.2948, need:40, time:"6:30 PM"  },
+  { name:"Tambaram NGO Kitchen",      lat:12.9249, lng:80.1000, need:60, time:"9:30 PM"  },
+  { name:"Triplicane Shelter",        lat:13.0578, lng:80.2785, need:35, time:"8:00 PM"  },
+];
+
+/* ══════════════════════════════════════════════════════
+   AUTH
+══════════════════════════════════════════════════════ */
+const ACCOUNTS = { provider:"1234", receiver:"1234", volunteer:"1234" };
+let currentRole = null;
+
+function doLogin() {
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value;
+  const err = document.getElementById('login-error');
+  if (ACCOUNTS[u] && ACCOUNTS[u] === p) {
+    localStorage.setItem('ff_role', u);
+    err.style.display = 'none';
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'flex';
+    initDashboard(u);
+  } else {
+    err.style.display = 'block';
+    document.getElementById('password').value = '';
+  }
+}
+
+function doLogout() {
+  localStorage.removeItem('ff_role');
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('username').value = '';
+  document.getElementById('password').value = '';
+  if (mapObj) { mapObj.remove(); mapObj = null; }
+  allMarkers = []; heatLayers = []; currentRoute = null;
+  pickMode = false; heatmapOn = false; currentRole = null;
+  clearAllTimers();
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('ff_role');
+  if (saved && ACCOUNTS[saved]) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'flex';
+    initDashboard(saved);
+  }
+});
+
+document.getElementById('password').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+
+/* ══════════════════════════════════════════════════════
+   GLOBAL STATE
+══════════════════════════════════════════════════════ */
+let mapObj       = null;
+let allMarkers   = [];   // { marker, data, type }
+let heatLayers   = [];
+let currentRoute = null;
+let pickMode     = false;
+let pendingLatLng= null;
+let currentFilter= 'all';
+let heatmapOn    = false;
+let timerIds     = [];
+let mealsSaved   = 245;
+let wasteReduced = 123;
+let lastMatchPair= null;  // { food, hunger } marker objects
+
+/* ══════════════════════════════════════════════════════
+   DASHBOARD INIT
+══════════════════════════════════════════════════════ */
+function initDashboard(role) {
+  currentRole = role;
+  const badge = document.getElementById('role-badge');
+
+  if (role === 'provider') {
+    badge.className = 'role-badge provider';
+    badge.innerHTML = '<span class="role-dot"></span>Logged in as: Food Provider';
+    document.getElementById('add-surplus-btn').style.display = 'flex';
+  } else if (role === 'volunteer') {
+    badge.className = 'role-badge volunteer';
+    badge.innerHTML = '<span class="role-dot"></span>Logged in as: Volunteer';
+    document.getElementById('add-surplus-btn').style.display = 'none';
+  } else {
+    badge.className = 'role-badge receiver';
+    badge.innerHTML = '<span class="role-dot"></span>Logged in as: Food Receiver';
+    document.getElementById('add-surplus-btn').style.display = 'none';
+  }
+
+  updateStats();
+
+  setTimeout(() => {
+    if (mapObj) return;
+    mapObj = L.map('map', { zoomControl:true, attributionControl:true })
+               .setView([13.0827, 80.2707], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution:'© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
+      maxZoom:19
+    }).addTo(mapObj);
+
+    FOOD_SOURCES.forEach(d => addFoodMarker(d.lat, d.lng, d.name, d.qty, d.time, d.expiresMin));
+    HUNGER_ZONES.forEach(d => addHungerMarker(d.lat, d.lng, d.name, d.need, d.time));
+
+    mapObj.on('click', e => {
+      if (!pickMode) return;
+      pendingLatLng = e.latlng;
+      togglePickMode();
+      openModal();
+    });
+  }, 80);
+}
+
+/* ══════════════════════════════════════════════════════
+   ICON FACTORY  (type: food | hunger | reserved | completed | sos)
+══════════════════════════════════════════════════════ */
+function makeIcon(type) {
+  const cfg = {
+    food:      { pin:'#2d7a4f', inner:'#5ecf85', emoji:'🍱' },
+    hunger:    { pin:'#c0392b', inner:'#e87066', emoji:'🆘' },
+    reserved:  { pin:'#d97706', inner:'#fbbf24', emoji:'🔒' },
+    completed: { pin:'#6b7280', inner:'#d1d5db', emoji:'✅' },
+    sos:       { pin:'#7c3aed', inner:'#c084fc', emoji:'🚨' },
+  };
+  const c = cfg[type] || cfg.food;
+  const pulse = type === 'sos'
+    ? `<animateTransform attributeName="transform" type="scale" values="1;1.18;1" dur="0.9s" repeatCount="indefinite" additive="sum"/>`
+    : '';
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="38" height="48" viewBox="0 0 38 48">
+      <filter id="sh${type}"><feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="${c.pin}" flood-opacity="0.35"/></filter>
+      <path d="M19 2 C9.06 2 1 10.06 1 20 C1 32 19 46 19 46 C19 46 37 32 37 20 C37 10.06 28.94 2 19 2Z"
+            fill="${c.pin}" filter="url(#sh${type})">${pulse}</path>
+      <circle cx="19" cy="19" r="9" fill="${c.inner}" opacity="0.9"/>
+      <text x="19" y="24" text-anchor="middle" font-size="11">${c.emoji}</text>
+    </svg>`;
+  return L.divIcon({ html:svg, className:'', iconSize:[38,48], iconAnchor:[19,46], popupAnchor:[0,-46] });
+}
+
+/* ══════════════════════════════════════════════════════
+   ADD MARKERS
+══════════════════════════════════════════════════════ */
+function addFoodMarker(lat, lng, name, qty, time, expiresMin) {
+  expiresMin = expiresMin || 90;
+  const expireAt = Date.now() + expiresMin * 60000;
+
+  const markerObj = { type:'food', status:'available', name, qty, time, expireAt, marker:null };
+  const lm = L.marker([lat, lng], { icon: makeIcon('food') });
+  markerObj.marker = lm;
+  lm._ffdata = markerObj;
+  lm._fftype = 'food';
+
+  lm.bindPopup(() => buildFoodPopup(markerObj), { className:'custom-popup', maxWidth:280 });
+  lm.addTo(mapObj);
+  allMarkers.push(markerObj);
+
+  // Expiry timer
+  startExpiryTimer(markerObj);
+}
+
+function addHungerMarker(lat, lng, name, need, time) {
+  const markerObj = { type:'hunger', status:'available', name, need, time, marker:null };
+  const lm = L.marker([lat, lng], { icon: makeIcon('hunger') });
+  markerObj.marker = lm;
+  lm._ffdata = markerObj;
+  lm._fftype = 'hunger';
+
+  lm.bindPopup(() => buildHungerPopup(markerObj), { className:'custom-popup', maxWidth:280 });
+  lm.addTo(mapObj);
+  allMarkers.push(markerObj);
+}
+
+/* ══════════════════════════════════════════════════════
+   POPUP BUILDERS
+══════════════════════════════════════════════════════ */
+function buildFoodPopup(d) {
+  const minsLeft = Math.max(0, Math.round((d.expireAt - Date.now()) / 60000));
+  const timerClass = minsLeft < 60 ? 'warn' : 'ok';
+  const hMins = minsLeft >= 60 ? `${Math.floor(minsLeft/60)}h ${minsLeft%60}m` : `${minsLeft}m`;
+
+  const statusBadge = {
+    available: '<div class="popup-type-badge green">🟢 Food Available</div>',
+    reserved:  '<div class="popup-type-badge orange">🔒 Reserved</div>',
+    completed: '<div class="popup-type-badge gray">✅ Completed</div>',
+  }[d.status] || '';
+
+  const actions = buildFoodActions(d);
+
+  const el = document.createElement('div');
+  el.className = 'popup-body';
+  el.innerHTML = `
+    ${statusBadge}
+    <div class="popup-name">${d.name}</div>
+    <div class="popup-detail"><span>🍱</span> Available: <strong>${d.qty} Meals</strong></div>
+    <div class="popup-detail"><span>⏰</span> Pickup before: <strong>${d.time}</strong></div>
+    <div class="popup-timer ${timerClass}">⏳ Expires in: ${hMins}</div>
+    ${actions}
+  `;
+  return el;
+}
+
+function buildFoodActions(d) {
+  if (d.status === 'completed') return '';
+  if (currentRole === 'provider') {
+    return `<div class="popup-actions">
+      <button class="popup-btn secondary" onclick="navigateFrom(this)">📍 Navigate</button>
+    </div>`;
+  }
+  if (currentRole === 'volunteer') {
+    if (d.status === 'reserved') {
+      return `<div class="popup-actions">
+        <button class="popup-btn volunteer-btn" onclick="completeDelivery(this)">✅ Mark Delivered</button>
+        <button class="popup-btn blue-btn" onclick="navigateFrom(this)">📍 Navigate</button>
+      </div>`;
+    }
+    return `<div class="popup-actions">
+      <button class="popup-btn primary" onclick="acceptDelivery(this)">🚚 Accept Delivery</button>
+      <button class="popup-btn blue-btn" onclick="navigateFrom(this)">📍 Navigate</button>
+    </div>`;
+  }
+  // receiver
+  if (d.status === 'available') {
+    return `<div class="popup-actions">
+      <button class="popup-btn primary"   onclick="reservePickup(this)">✅ Reserve Pickup</button>
+      <button class="popup-btn blue-btn"  onclick="navigateFrom(this)">📍 Navigate</button>
+    </div>`;
+  }
+  return `<div class="popup-actions">
+    <button class="popup-btn secondary" onclick="navigateFrom(this)">📍 Navigate</button>
+  </div>`;
+}
+
+function buildHungerPopup(d) {
+  const statusBadge = {
+    available: '<div class="popup-type-badge red">🔴 Food Needed</div>',
+    reserved:  '<div class="popup-type-badge orange">🔒 Request Sent</div>',
+    completed: '<div class="popup-type-badge gray">✅ Fulfilled</div>',
+  }[d.status] || '';
+
+  const actions = buildHungerActions(d);
+
+  const el = document.createElement('div');
+  el.className = 'popup-body';
+  el.innerHTML = `
+    ${statusBadge}
+    <div class="popup-name">${d.name}</div>
+    <div class="popup-detail"><span>🆘</span> Needs: <strong>${d.need} Meals</strong></div>
+    <div class="popup-detail"><span>⏰</span> Required by: <strong>${d.time}</strong></div>
+    ${actions}
+  `;
+  return el;
+}
+
+function buildHungerActions(d) {
+  if (d.status === 'completed') return '';
+  if (currentRole === 'volunteer') {
+    return `<div class="popup-actions">
+      <button class="popup-btn volunteer-btn" onclick="completeHunger(this)">✅ Mark Fulfilled</button>
+      <button class="popup-btn blue-btn"      onclick="navigateFrom(this)">📍 Navigate</button>
+    </div>`;
+  }
+  if (d.status === 'available') {
+    return `<div class="popup-actions">
+      <button class="popup-btn danger"   onclick="requestFood(this)">🚨 Request Food</button>
+      <button class="popup-btn blue-btn" onclick="navigateFrom(this)">📍 Navigate</button>
+    </div>`;
+  }
+  return `<div class="popup-actions">
+    <button class="popup-btn secondary" onclick="navigateFrom(this)">📍 Navigate</button>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════
+   POPUP ACTIONS (called from inline onclick)
+══════════════════════════════════════════════════════ */
+function getMarkerFromBtn(btn) {
+  // Walk up to popup content → find the open popup's marker
+  for (const mo of allMarkers) {
+    if (mo.marker.isPopupOpen()) return mo;
+  }
+  return null;
+}
+
+function reservePickup(btn) {
+  const mo = getMarkerFromBtn(btn);
+  if (!mo) return;
+  mo.status = 'reserved';
+  mo.marker.setIcon(makeIcon('reserved'));
+  mo.marker.closePopup();
+  mealsSaved += mo.qty;
+  wasteReduced += Math.round(mo.qty * 0.5);
+  updateStats();
+  showToast('✅ Pickup Reserved!');
+  setTimeout(() => showToast('🔔 NGO notified of your reservation'), 800);
+  setTimeout(() => showToast('🚚 Volunteer being assigned…'), 1800);
+  applyFilter(currentFilter);
+}
+
+function requestFood(btn) {
+  const mo = getMarkerFromBtn(btn);
+  if (!mo) return;
+  mo.status = 'reserved';
+  mo.marker.setIcon(makeIcon('reserved'));
+  mo.marker.closePopup();
+  showToast('🚨 Food Request Sent!');
+  setTimeout(() => showToast('🔔 NGO notified of your request'), 800);
+  setTimeout(() => showToast('🚚 Volunteer being dispatched…'), 1800);
+  applyFilter(currentFilter);
+}
+
+function acceptDelivery(btn) {
+  const mo = getMarkerFromBtn(btn);
+  if (!mo) return;
+  mo.status = 'reserved';
+  mo.marker.setIcon(makeIcon('reserved'));
+  mo.marker.closePopup();
+  showToast('🚚 Delivery Accepted! Head to pickup location.');
+  setTimeout(() => showToast('🔔 Provider has been notified'), 1000);
+  applyFilter(currentFilter);
+}
+
+function completeDelivery(btn) {
+  const mo = getMarkerFromBtn(btn);
+  if (!mo) return;
+  mo.status = 'completed';
+  mo.marker.setIcon(makeIcon('completed'));
+  mo.marker.closePopup();
+  mealsSaved += mo.qty || 0;
+  wasteReduced += Math.round((mo.qty || 0) * 0.5);
+  updateStats();
+  showToast('✅ Delivery Completed!');
+  setTimeout(() => showToast('🎉 Impact recorded — great work!'), 800);
+  applyFilter(currentFilter);
+}
+
+function completeHunger(btn) {
+  const mo = getMarkerFromBtn(btn);
+  if (!mo) return;
+  mo.status = 'completed';
+  mo.marker.setIcon(makeIcon('completed'));
+  mo.marker.closePopup();
+  showToast('✅ Delivery Completed – Hunger Zone Fulfilled!');
+  applyFilter(currentFilter);
+}
+
+function navigateFrom(btn) {
+  const mo = getMarkerFromBtn(btn);
+  if (!mo) return;
+  const latlng = mo.marker.getLatLng();
+  // Draw a route from map center to this marker as a simple visual
+  clearRoute();
+  currentRoute = L.polyline([
+    [13.0827, 80.2707],
+    [latlng.lat, latlng.lng]
+  ], { color:'#1d4ed8', weight:3, dashArray:'8 6', opacity:0.75 }).addTo(mapObj);
+  mapObj.fitBounds(currentRoute.getBounds(), { padding:[40,40] });
+  mo.marker.closePopup();
+  showToast(`📍 Route drawn to ${mo.name}`);
+}
+
+/* ══════════════════════════════════════════════════════
+   EXPIRY TIMER
+══════════════════════════════════════════════════════ */
+function startExpiryTimer(mo) {
+  const id = setInterval(() => {
+    if (!mapObj) { clearInterval(id); return; }
+    const minsLeft = Math.round((mo.expireAt - Date.now()) / 60000);
+    if (minsLeft <= 0 && mo.status === 'available') {
+      mo.status = 'completed';
+      mo.marker.setIcon(makeIcon('completed'));
+      showToast(`⚠ "${mo.name}" expired — food no longer available`);
+      clearInterval(id);
+    }
+    // Refresh open popup's timer display
+    if (mo.marker.isPopupOpen()) {
+      mo.marker.setPopupContent(buildFoodPopup(mo));
+    }
+  }, 30000); // check every 30s
+  timerIds.push(id);
+}
+
+function clearAllTimers() { timerIds.forEach(clearInterval); timerIds = []; }
+
+/* ══════════════════════════════════════════════════════
+   PICK MODE
+══════════════════════════════════════════════════════ */
+function togglePickMode() {
+  pickMode = !pickMode;
+  const btn  = document.getElementById('add-surplus-btn');
+  const icon = document.getElementById('add-btn-icon');
+  const text = document.getElementById('add-btn-text');
+  const mapEl= document.getElementById('map');
+  if (pickMode) {
+    btn.classList.add('picking');
+    icon.textContent = '✕';
+    text.textContent = 'Click map to place';
+    mapEl.classList.add('picking-mode');
+    showToast('📍 Click anywhere on the map to place a marker');
+  } else {
+    btn.classList.remove('picking');
+    icon.textContent = '＋';
+    text.textContent = 'Add Surplus Food';
+    mapEl.classList.remove('picking-mode');
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   MODAL
+══════════════════════════════════════════════════════ */
+function openModal() {
+  document.getElementById('modal-overlay').classList.add('open');
+  ['m-name','m-qty','m-time','m-expires'].forEach(id => document.getElementById(id).value = '');
+  setTimeout(() => document.getElementById('m-name').focus(), 100);
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  pendingLatLng = null;
+}
+function confirmAdd() {
+  const name    = document.getElementById('m-name').value.trim();
+  const qty     = parseInt(document.getElementById('m-qty').value);
+  const time    = document.getElementById('m-time').value.trim();
+  const expires = parseInt(document.getElementById('m-expires').value) || 90;
+  if (!name || !qty || !time) { showToast('⚠ Please fill in all fields'); return; }
+  if (!pendingLatLng) { closeModal(); return; }
+  addFoodMarker(pendingLatLng.lat, pendingLatLng.lng, name, qty, time, expires);
+  mealsSaved += qty;
+  wasteReduced += Math.round(qty * 0.5);
+  updateStats();
+  applyFilter(currentFilter);
+  closeModal();
+  showToast(`✅ "${name}" added to the map!`);
+  setTimeout(() => showToast('🔔 NGO notified of new food surplus'), 900);
+}
+
+/* ══════════════════════════════════════════════════════
+   FILTER
+══════════════════════════════════════════════════════ */
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.className = 'filter-btn');
+  if (f === 'all')    document.getElementById('btn-all').classList.add('active-all');
+  if (f === 'food')   document.getElementById('btn-food').classList.add('active-food');
+  if (f === 'hunger') document.getElementById('btn-hunger').classList.add('active-hunger');
+  applyFilter(f);
+}
+function applyFilter(f) {
+  allMarkers.forEach(mo => {
+    const show = f === 'all'
+      || (f === 'food'   && mo.type === 'food')
+      || (f === 'hunger' && mo.type === 'hunger');
+    if (show) { if (!mapObj.hasLayer(mo.marker)) mapObj.addLayer(mo.marker); }
+    else       { if (mapObj.hasLayer(mo.marker))  mapObj.removeLayer(mo.marker); }
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   STATS
+══════════════════════════════════════════════════════ */
+function updateStats() {
+  const food   = allMarkers.filter(m => m.type === 'food').length;
+  const hunger = allMarkers.filter(m => m.type === 'hunger').length;
+  document.getElementById('stat-food').textContent   = food;
+  document.getElementById('stat-hunger').textContent = hunger;
+  document.getElementById('stat-meals').textContent  = mealsSaved;
+  document.getElementById('stat-waste').textContent  = wasteReduced;
+}
+
+/* ══════════════════════════════════════════════════════
+   HAVERSINE DISTANCE (km)
+══════════════════════════════════════════════════════ */
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLng = (lng2-lng1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+/* ══════════════════════════════════════════════════════
+   SMART MATCH
+══════════════════════════════════════════════════════ */
+function findBestMatch() {
+  const foods   = allMarkers.filter(m => m.type==='food'   && m.status==='available');
+  const hungers = allMarkers.filter(m => m.type==='hunger' && m.status==='available');
+  if (!foods.length || !hungers.length) {
+    showToast('⚠ No available sources or zones to match'); return;
+  }
+
+  let best = null, bestDist = Infinity;
+  for (const f of foods) {
+    for (const h of hungers) {
+      const fl = f.marker.getLatLng(), hl = h.marker.getLatLng();
+      const d = haversine(fl.lat, fl.lng, hl.lat, hl.lng);
+      if (d < bestDist) { bestDist = d; best = { f, h }; }
+    }
+  }
+
+  lastMatchPair = best;
+  const panel = document.getElementById('match-panel');
+  document.getElementById('match-result').innerHTML = `
+    <strong>${best.f.name}</strong>
+    <span class="match-arrow">→</span>
+    <strong>${best.h.name}</strong>
+    <br/>
+    <span class="match-tag dist">📏 ${bestDist.toFixed(1)} km away</span>&nbsp;
+    <span class="match-tag meals">🍱 ${best.f.qty} meals available</span>
+  `;
+  panel.classList.add('open');
+  showToast('🔍 Best match computed!');
+}
+
+function closeMatchPanel() {
+  document.getElementById('match-panel').classList.remove('open');
+}
+
+function drawMatchRoute() {
+  if (!lastMatchPair) return;
+  clearRoute();
+  const fl = lastMatchPair.f.marker.getLatLng();
+  const hl = lastMatchPair.h.marker.getLatLng();
+  currentRoute = L.polyline([fl, hl], {
+    color:'#1d4ed8', weight:4, dashArray:'10 6', opacity:0.8
+  }).addTo(mapObj);
+  mapObj.fitBounds(currentRoute.getBounds(), { padding:[60,60] });
+  closeMatchPanel();
+  showToast(`📍 Route: ${lastMatchPair.f.name} → ${lastMatchPair.h.name}`);
+}
+
+function clearRoute() {
+  if (currentRoute) { mapObj.removeLayer(currentRoute); currentRoute = null; }
+}
+
+/* ══════════════════════════════════════════════════════
+   HEATMAP
+══════════════════════════════════════════════════════ */
+function toggleHeatmap() {
+  const btn = document.getElementById('btn-heat');
+  if (heatmapOn) {
+    heatLayers.forEach(l => mapObj.removeLayer(l));
+    heatLayers = [];
+    heatmapOn = false;
+    btn.className = 'filter-btn';
+    showToast('🌡 Heatmap hidden');
+  } else {
+    // Green circles for food density
+    allMarkers.filter(m => m.type === 'food').forEach(mo => {
+      const ll = mo.marker.getLatLng();
+      const c = L.circle([ll.lat, ll.lng], {
+        radius: 1200, color:'transparent',
+        fillColor:'#2d7a4f', fillOpacity:0.18
+      }).addTo(mapObj);
+      heatLayers.push(c);
+    });
+    // Red circles for hunger density
+    allMarkers.filter(m => m.type === 'hunger').forEach(mo => {
+      const ll = mo.marker.getLatLng();
+      const c = L.circle([ll.lat, ll.lng], {
+        radius: 1200, color:'transparent',
+        fillColor:'#c0392b', fillOpacity:0.18
+      }).addTo(mapObj);
+      heatLayers.push(c);
+    });
+    heatmapOn = true;
+    btn.classList.add('active-heat');
+    showToast('🔥 Heatmap enabled');
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   SOS / URGENT
+══════════════════════════════════════════════════════ */
+function addSOS() {
+  const center = mapObj.getCenter();
+  const lat = center.lat + (Math.random()-0.5)*0.04;
+  const lng = center.lng + (Math.random()-0.5)*0.04;
+  const name = 'Urgent Need – ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+
+  const markerObj = { type:'hunger', status:'sos', name, need:50, time:'ASAP', marker:null };
+  const lm = L.marker([lat, lng], { icon: makeIcon('sos'), zIndexOffset:1000 });
+  markerObj.marker = lm;
+  lm._ffdata = markerObj; lm._fftype = 'hunger';
+
+  const el = document.createElement('div');
+  el.className = 'popup-body';
+  el.innerHTML = `
+    <div class="popup-type-badge" style="background:#f3e8ff;color:#7c3aed">🚨 URGENT / SOS</div>
+    <div class="popup-name">${name}</div>
+    <div class="popup-detail"><span>🆘</span> Priority: <strong>CRITICAL</strong></div>
+    <div class="popup-detail"><span>⏰</span> Needed: <strong>ASAP</strong></div>
+    <div class="popup-actions">
+      <button class="popup-btn danger" onclick="requestFood(this)">🚨 Respond</button>
+    </div>
+  `;
+  lm.bindPopup(el, { className:'custom-popup', maxWidth:280 });
+  lm.addTo(mapObj);
+  allMarkers.push(markerObj);
+  mapObj.setView([lat, lng], 13, { animate:true });
+  updateStats();
+  showToast('🚨 SOS marker added — highest priority!');
+  setTimeout(() => showToast('🔔 All nearby NGOs notified'), 900);
+}
+
+/* ══════════════════════════════════════════════════════
+   TOAST QUEUE
+══════════════════════════════════════════════════════ */
+function showToast(msg, duration=2800) {
+  const container = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast-item';
+  t.textContent = msg;
+  container.appendChild(t);
+  setTimeout(() => {
+    t.classList.add('out');
+    setTimeout(() => t.remove(), 320);
+  }, duration);
+}
+
+/* ══════════════════════════════════════════════════════
+   MISC
+══════════════════════════════════════════════════════ */
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+</script>
+</body>
+</html>
